@@ -139,7 +139,8 @@ jobs:
             elif [[ "$commit_type_for_logic" == "fix" || "$commit_type_for_logic" == "perf" ]]; then
               SKIP_RELEASE="false" # VSTEP remains patch unless already minor or major
             fi
-            release_notes_body="${release_notes_body}* ${commit_line}"
+            release_notes_body="${release_notes_body}* ${commit_line}
+          "
           done <<< "${commits}"
           
           if [ -n "$release_notes_body" ]; then
