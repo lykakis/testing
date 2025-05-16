@@ -155,29 +155,51 @@ jobs:
           fi
 
           echo "Determined version increment step: $VSTEP based on commits."
-          TARGET_VERSION_BASE="${CURRENT_PROJECT_VERSION}" # Start bumping from current version from pom.xml
+           # --- Version Bumping Logic (Corrected) ---
+          TARGET_VERSION_BASE="${CURRENT_PROJECT_VERSION}" 
           FINAL_NEW_VERSION=""
-          while true; do # Loop to find a unique new version tag
-            IFS='.' read -r v_major v_minor v_patch <<< "$(echo "$TARGET_VERSION_BASE" | awk -F. '{print $1" "$2" "$3}')"
-            v_major=${v_major:-0}; v_minor=${v_minor:-0}; v_patch=${v_patch:-0}
+          VSTEP_EFFECTIVE="$VSTEP" # Use this for current iteration's bump type
 
-            if [[ "$VSTEP" == "major" ]]; then
-              v_major=$((v_major + 1)); v_minor=0; v_patch=0
-            elif [[ "$VSTEP" == "minor" ]]; then
-              v_minor=$((v_minor + 1)); v_patch=0
-            elif [[ "$VSTEP" == "patch" ]]; then
-              v_patch=$((v_patch + 1))
+          while true; do 
+            # Parse TARGET_VERSION_BASE (e.g., "1.0.0" or "0.2.5-SNAPSHOT")
+            # This correctly splits by '.' without introducing extra spaces.
+            IFS='.' read -r v_maj_raw v_min_raw v_pat_raw <<< "$TARGET_VERSION_BASE"
+
+            v_major=${v_maj_raw:-0}
+            v_minor=${v_min_raw:-0}
+          
+            # Extract numeric part of patch, handling suffixes like -SNAPSHOT
+            # Uses grep to get leading digits only. Defaults to "0" if no digits or empty.
+            v_patch_numeric_str=$(echo "${v_pat_raw:-0}" | grep -o '^[0-9]\+' || echo "0")
+            v_patch_numeric=${v_patch_numeric_str:-0} # Ensure it's a number, default to 0
+
+            echo "Debug: Parsed base for iteration: M=$v_major, m=$v_minor, p_num=$v_patch_numeric (from $TARGET_VERSION_BASE). VSTEP_EFFECTIVE=$VSTEP_EFFECTIVE"
+
+            # Increment based on VSTEP_EFFECTIVE
+            if [[ "$VSTEP_EFFECTIVE" == "major" ]]; then
+              v_major=$((v_major + 1))
+              v_minor=0 # Reset minor and patch
+              v_patch_numeric=0
+            elif [[ "$VSTEP_EFFECTIVE" == "minor" ]]; then
+              v_minor=$((v_minor + 1))
+              v_patch_numeric=0 # Reset patch
+            elif [[ "$VSTEP_EFFECTIVE" == "patch" ]]; then
+              v_patch_numeric=$((v_patch_numeric + 1))
             fi
-            PROPOSED_VERSION="$v_major.$v_minor.$v_patch"
+          
+            # Construct the proposed new version string
+            PROPOSED_VERSION="$v_major.$v_minor.$v_patch_numeric"
+            echo "Debug: Proposed version after increment: $PROPOSED_VERSION"
 
+            # Check if this tag already exists
             if git tag --list "${PROPOSED_VERSION}" | grep -qw "${PROPOSED_VERSION}"; then
               echo "Tag ${PROPOSED_VERSION} already exists. Will increment patch from this version and retry."
               TARGET_VERSION_BASE="${PROPOSED_VERSION}" # Next attempt will bump from this existing tag
-              VSTEP="patch" # Force next increment to be a patch
+              VSTEP_EFFECTIVE="patch" # Force next increment to be a patch
             else
               FINAL_NEW_VERSION="${PROPOSED_VERSION}"
               echo "Final new version determined: ${FINAL_NEW_VERSION}"
-              break # Exit loop, version is unique
+              break # Exit loop, unique version found
             fi
           done
 
