@@ -1,29 +1,248 @@
-# This is a basic workflow to help you get started with Actions
+# This workflow handles CI (Build and Test) and post-merge operations including semantic release.
+name: CI and Semantic Release Operations
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  push: # Run on every push to any branch
-    branches: [ main ] # Or specify branches like [ main, develop ]
-  pull_request: # Also run on pull requests to these branches
+  push:
     branches: [ main ]
-  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
+  pull_request:
+    types: [ opened, synchronize, reopened, closed ] # 'closed' is needed for merge events
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write      # To push version changes, changelog, and create releases
+  pull-requests: read  # To read PR details
+  # issues: write        # If your conventional commits link issues and you want to update them (optional)
+  # actions: read        # Default
 
 jobs:
-  build-and-test: # You can name this job anything
-    runs-on: ubuntu-latest # Specifies the type of virtual machine to run the job on
-
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
     steps:
-      # Step 1: Check out the code from your repository
       - name: Checkout repository
-        uses: actions/checkout@v4 # Official GitHub action to checkout code
-      - name: Setup Java
+        uses: actions/checkout@v4
+
+      - name: Setup Java (GraalVM)
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: 21
           distribution: 'graalvm'
           cache: 'maven'
-      # For Quarkus, 'mvn install' or 'mvn verify' typically runs tests
+
       - name: Build and test with Maven
         run: mvn -B clean install
+
+  post-merge-actions:
+    name: Post-Merge (Version, Changelog, Release, Notify)
+    runs-on: ubuntu-latest
+    # Only run if a PR was successfully merged into the main branch
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    needs: [ build-and-test ] # Ensures build-and-test passed on the merge commit
+
+    steps:
+      - name: Full Checkout for Release Process
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for git describe (tags) and git log (commits)
+          token: ${{ secrets.GITHUB_TOKEN }} # Use GITHUB_TOKEN for checkout and subsequent push
+          ref: 'main' # Explicitly checkout the main branch post-merge
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          echo "Git user configured for commits."
+
+      - name: Setup Java (GraalVM) for versioning
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: 21
+          distribution: 'graalvm'
+
+
+      - name: Check Version, Generate Changelog, and Commit Changes
+        id: version_check_release_prep
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e # Exit immediately if a command exits with a non-zero status.
+          # set -x # Uncomment for detailed command printing during debugging
+
+          echo "Ensuring local main is up-to-date with remote..."
+          git pull origin main --ff-only # Ensure working branch is latest main
+
+          # --- Determine Current Version from ./testing/pom.xml ---
+          if [ ! -d "./testing" ]; then echo "Error: ./testing directory not found."; exit 1; fi
+          cd ./testing # Navigate into the project directory
+          if [ -f "./mvnw" ]; then # Check for Maven wrapper in ./testing
+            chmod +x ./mvnw
+            CURRENT_PROJECT_VERSION=$(./mvnw -q -B org.apache.maven.plugins:maven-help-plugin:evaluate -Dexpression=project.version -DforceStdout)
+          elif command -v mvn &> /dev/null; then # Fallback to global mvn
+            CURRENT_PROJECT_VERSION=$(mvn -q -B org.apache.maven.plugins:maven-help-plugin:evaluate -Dexpression=project.version -DforceStdout)
+          else
+            echo "Error: Neither ./testing/mvnw nor global mvn command found."
+            exit 1
+          fi
+          echo "Current version from ./testing/pom.xml: ${CURRENT_PROJECT_VERSION}"
+          cd .. # Return to the repository root
+
+          # --- Fetch all tags ---
+          echo "Fetching all tags..."
+          git fetch --all --tags --prune --force # Ensure all remote tags are available locally
+
+          # --- Generate Release Notes from Commits ---
+          prevTag=$(git describe --tags --abbrev=0 2>/dev/null || echo "") # Get last tag, or empty if no tags
+
+          commits_range_log=""
+          if [ -n "$prevTag" ]; then
+            echo "Previous tag found: $prevTag. Getting commits since then."
+            commits_range_log="$prevTag..HEAD"
+          else
+            echo "No previous tags found. Changelog will include all commits on current branch (main)."
+            commits_range_log="HEAD"
+          fi
+
+          echo "Generating changelog for commit range: $commits_range_log"
+          commits=$(git log $commits_range_log --pretty="format:%h %s" --no-decorate)
+
+          release_notes_body=''
+          SKIP_RELEASE="true" # Default to skipping release unless relevant commits are found
+          VSTEP='patch'       # Default version increment step: patch, minor, major
+
+          while IFS= read -r commit_line; do
+            if [ -z "$commit_line" ]; then continue; fi
+
+            commit_hash=$(echo "${commit_line}" | awk '{print $1}')
+            commit_subject=$(echo "${commit_line}" | cut -d' ' -f2-)
+
+            is_merge_commit=$(git show --no-patch --format=%P "$commit_hash" | wc -w)
+            if [ "$is_merge_commit" -gt 1 ]; then
+              echo "Skipping merge commit: $commit_line"
+              continue
+            fi
+            if [[ "$commit_subject" == chore\(release\):* || "$commit_subject" == ci:* ]]; then
+                echo "Skipping CI/release chore commit: $commit_line"
+                continue
+            fi
+
+            commit_type_extracted=$(echo "$commit_subject" | grep -Eo '^[a-zA-Z]+(\([a-zA-Z0-9_/-]+\))?!?' | tr '[:upper:]' '[:lower:]' || echo "")
+            is_breaking=false
+            if [[ "$commit_type_extracted" == *"!"* ]]; then
+              is_breaking=true
+              commit_type_for_logic=$(echo "$commit_type_extracted" | sed 's/!$//')
+            else
+              commit_type_for_logic="$commit_type_extracted"
+            fi
+
+            echo "Commit: $commit_line | Extracted Type: $commit_type_for_logic | Breaking Marker: $is_breaking"
+
+            if [[ "$is_breaking" == "true" ]]; then
+              SKIP_RELEASE="false"; VSTEP='major'
+            elif [[ "$commit_type_for_logic" == "feat" ]]; then
+              SKIP_RELEASE="false"; if [[ "$VSTEP" != "major" ]]; then VSTEP='minor'; fi
+            elif [[ "$commit_type_for_logic" == "fix" || "$commit_type_for_logic" == "perf" ]]; then
+              SKIP_RELEASE="false" # VSTEP remains patch unless already minor or major
+            fi
+            release_notes_body="${release_notes_body}* ${commit_line}"
+          done <<< "${commits}"
+          
+          if [ -n "$release_notes_body" ]; then
+            release_notes_body=$(echo "${release_notes_body}" | sed 's/[[:space:]]*$//')
+          else
+            SKIP_RELEASE="true"
+          fi
+
+          if [[ "$SKIP_RELEASE" == "true" ]]; then
+            echo "No relevant commits (feat/fix/perf or breaking change) found since last tag ($prevTag)."
+            echo "SKIP_RELEASE=true" >> "$GITHUB_ENV"
+            exit 0 # Successfully exit, subsequent release step will be skipped
+          fi
+
+          echo "Determined version increment step: $VSTEP based on commits."
+          TARGET_VERSION_BASE="${CURRENT_PROJECT_VERSION}" # Start bumping from current version from pom.xml
+          FINAL_NEW_VERSION=""
+          while true; do # Loop to find a unique new version tag
+            IFS='.' read -r v_major v_minor v_patch <<< "$(echo "$TARGET_VERSION_BASE" | awk -F. '{print $1" "$2" "$3}')"
+            v_major=${v_major:-0}; v_minor=${v_minor:-0}; v_patch=${v_patch:-0}
+
+            if [[ "$VSTEP" == "major" ]]; then
+              v_major=$((v_major + 1)); v_minor=0; v_patch=0
+            elif [[ "$VSTEP" == "minor" ]]; then
+              v_minor=$((v_minor + 1)); v_patch=0
+            elif [[ "$VSTEP" == "patch" ]]; then
+              v_patch=$((v_patch + 1))
+            fi
+            PROPOSED_VERSION="$v_major.$v_minor.$v_patch"
+
+            if git tag --list "${PROPOSED_VERSION}" | grep -qw "${PROPOSED_VERSION}"; then
+              echo "Tag ${PROPOSED_VERSION} already exists. Will increment patch from this version and retry."
+              TARGET_VERSION_BASE="${PROPOSED_VERSION}" # Next attempt will bump from this existing tag
+              VSTEP="patch" # Force next increment to be a patch
+            else
+              FINAL_NEW_VERSION="${PROPOSED_VERSION}"
+              echo "Final new version determined: ${FINAL_NEW_VERSION}"
+              break # Exit loop, version is unique
+            fi
+          done
+
+          # --- Update version in ./testing/pom.xml ---
+          echo "Setting version to ${FINAL_NEW_VERSION} in ./testing/pom.xml..."
+          cd ./testing # Navigate into the project directory
+          if [ -f "./mvnw" ]; then
+            ./mvnw -q -B org.codehaus.mojo:versions-maven-plugin:set -DnewVersion="${FINAL_NEW_VERSION}" -DgenerateBackupPoms=false
+          else
+            mvn -q -B org.codehaus.mojo:versions-maven-plugin:set -DnewVersion="${FINAL_NEW_VERSION}" -DgenerateBackupPoms=false
+          fi
+          git add pom.xml # Stage ./testing/pom.xml
+          cd .. # Return to the repository root
+
+          # --- Update Changelog.md (at the root) ---
+          echo "Updating Changelog.md for version ${FINAL_NEW_VERSION}..."
+          TEMP_CHANGELOG="CHANGELOG.md.tmp" # Temporary file in the root
+          {
+            echo "## ${FINAL_NEW_VERSION} ($(date +%Y-%m-%d))"
+            echo ""
+            echo "${release_notes_body}"
+            echo "" # Ensure a blank line before old content
+          } > "${TEMP_CHANGELOG}"
+
+          if [ -f "CHANGELOG.md" ]; then # Check for existing changelog in the root
+            cat "CHANGELOG.md" >> "${TEMP_CHANGELOG}"
+          else
+            echo "Creating new CHANGELOG.md."
+          fi
+          mv "${TEMP_CHANGELOG}" "CHANGELOG.md"
+          git add CHANGELOG.md # Stage ./CHANGELOG.md
+          echo "Changelog.md updated."
+          # ------- Commit and Push all changes (./testing/pom.xml and ./CHANGELOG.md) ---
+          
+          if git diff --staged --quiet; then
+            echo "No files were changed by the versioning script unexpectedly. Skipping commit."
+            echo "SKIP_RELEASE=true" >> "$GITHUB_ENV" # Prevent release if no files changed
+          else
+            echo "Committing version ${FINAL_NEW_VERSION} and changelog updates..."
+            COMMIT_MESSAGE_BODY="Generated release notes: ${release_notes_body}"
+            git commit -m "chore(release): Version ${FINAL_NEW_VERSION} [skip ci]" -m "${COMMIT_MESSAGE_BODY}"
+            echo "Pushing changes to main..."
+            git push origin main
+            echo "SKIP_RELEASE=false" >> "$GITHUB_ENV"
+          fi
+          # --- Set outputs for GitHub Release step ---
+          echo "VERSION=${FINAL_NEW_VERSION}" >> "$GITHUB_ENV"
+          echo 'RELEASE_NOTES_TEXT<<EOF' >> "$GITHUB_ENV"
+          echo "${release_notes_body}" >> "$GITHUB_ENV"
+          echo 'EOF' >> "$GITHUB_ENV"
+          echo "Environment variables VERSION and RELEASE_NOTES_TEXT set for release step."
+
+      - name: Create GitHub Release
+        id: create_gh_release
+        uses: softprops/action-gh-release@v2
+        if: success() && env.SKIP_RELEASE != 'true' && env.VERSION != ''
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ env.VERSION }}
+          name: Release ${{ env.VERSION }}
+          body: ${{ env.RELEASE_NOTES_TEXT }}
+          draft: false
+          prerelease: false
