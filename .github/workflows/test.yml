@@ -37,7 +37,7 @@ jobs:
     name: Post-Merge (Version, Changelog, Release, Notify)
     runs-on: ubuntu-latest
     # Only run if a PR was successfully merged into the main branch
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
     needs: [ build-and-test ] # Ensures build-and-test passed on the merge commit
 
     steps:
@@ -60,6 +60,17 @@ jobs:
           java-version: 21
           distribution: 'graalvm'
 
+      - name: Debug after Checkout  # <-- ADD THIS DEBUG STEP
+        run: |
+          echo "--- Debugging after checkout ---"
+          echo "Current directory: $(pwd)"
+          echo "Listing files (including hidden):"
+          ls -la
+          echo "Git status:"
+          git status
+          echo "Git remote -v:"
+          git remote -v
+          echo "--- End Debugging after checkout ---"
 
       - name: Check Version, Generate Changelog, and Commit Changes
         id: version_check_release_prep
