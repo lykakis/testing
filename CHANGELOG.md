@@ -1,3 +1,9 @@
+## 1.0.4 (2025-05-16)
+
+* 12ac5df fix(test): cd2
+* abb3d5a chore(test): cd2
+* 08d1f61 chore(test): cd1
+
 ## 1.0.3 (2025-05-16)
 
 * dcf5ac7 fix(test): cd2
