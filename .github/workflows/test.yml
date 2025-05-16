@@ -60,18 +60,6 @@ jobs:
           java-version: 21
           distribution: 'graalvm'
 
-      - name: Debug after Checkout  # <-- ADD THIS DEBUG STEP
-        run: |
-          echo "--- Debugging after checkout ---"
-          echo "Current directory: $(pwd)"
-          echo "Listing files (including hidden):"
-          ls -la
-          echo "Git status:"
-          git status
-          echo "Git remote -v:"
-          git remote -v
-          echo "--- End Debugging after checkout ---"
-
       - name: Check Version, Generate Changelog, and Commit Changes
         id: version_check_release_prep
         env:
@@ -94,8 +82,6 @@ jobs:
             exit 1
           fi
           echo "Current version from ./pom.xml: ${CURRENT_PROJECT_VERSION}"
-          cd .. # Return to the repository root
-
           # --- Fetch all tags ---
           echo "Fetching all tags..."
           git fetch --all --tags --prune --force # Ensure all remote tags are available locally
