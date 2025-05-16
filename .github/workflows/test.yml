@@ -72,19 +72,17 @@ jobs:
           echo "Ensuring local main is up-to-date with remote..."
           git pull origin main --ff-only # Ensure working branch is latest main
 
-          # --- Determine Current Version from ./testing/pom.xml ---
-          if [ ! -d "./testing" ]; then echo "Error: ./testing directory not found."; exit 1; fi
-          cd ./testing # Navigate into the project directory
-          if [ -f "./mvnw" ]; then # Check for Maven wrapper in ./testing
+          # --- Determine Current Version from ./pom.xml ---
+          if [ -f "./mvnw" ]; then # Check for Maven wrapper in 
             chmod +x ./mvnw
             CURRENT_PROJECT_VERSION=$(./mvnw -q -B org.apache.maven.plugins:maven-help-plugin:evaluate -Dexpression=project.version -DforceStdout)
           elif command -v mvn &> /dev/null; then # Fallback to global mvn
             CURRENT_PROJECT_VERSION=$(mvn -q -B org.apache.maven.plugins:maven-help-plugin:evaluate -Dexpression=project.version -DforceStdout)
           else
-            echo "Error: Neither ./testing/mvnw nor global mvn command found."
+            echo "Error: Neither ./mvnw nor global mvn command found."
             exit 1
           fi
-          echo "Current version from ./testing/pom.xml: ${CURRENT_PROJECT_VERSION}"
+          echo "Current version from ./pom.xml: ${CURRENT_PROJECT_VERSION}"
           cd .. # Return to the repository root
 
           # --- Fetch all tags ---
@@ -186,15 +184,14 @@ jobs:
             fi
           done
 
-          # --- Update version in ./testing/pom.xml ---
-          echo "Setting version to ${FINAL_NEW_VERSION} in ./testing/pom.xml..."
-          cd ./testing # Navigate into the project directory
+          # --- Update version in ./pom.xml ---
+          echo "Setting version to ${FINAL_NEW_VERSION} in ./pom.xml..."
           if [ -f "./mvnw" ]; then
             ./mvnw -q -B org.codehaus.mojo:versions-maven-plugin:set -DnewVersion="${FINAL_NEW_VERSION}" -DgenerateBackupPoms=false
           else
             mvn -q -B org.codehaus.mojo:versions-maven-plugin:set -DnewVersion="${FINAL_NEW_VERSION}" -DgenerateBackupPoms=false
           fi
-          git add pom.xml # Stage ./testing/pom.xml
+          git add pom.xml # Stage ./pom.xml
           cd .. # Return to the repository root
 
           # --- Update Changelog.md (at the root) ---
@@ -215,7 +212,7 @@ jobs:
           mv "${TEMP_CHANGELOG}" "CHANGELOG.md"
           git add CHANGELOG.md # Stage ./CHANGELOG.md
           echo "Changelog.md updated."
-          # ------- Commit and Push all changes (./testing/pom.xml and ./CHANGELOG.md) ---
+          # ------- Commit and Push all changes (./pom.xml and ./CHANGELOG.md) ---
           
           if git diff --staged --quiet; then
             echo "No files were changed by the versioning script unexpectedly. Skipping commit."
