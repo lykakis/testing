@@ -156,7 +156,7 @@ jobs:
           fi
 
           echo "Determined version increment step: $VSTEP based on commits."
-           # --- Version Bumping Logic (Corrected) ----
+           # --- Version Bumping Logic (Corrected) -----
           TARGET_VERSION_BASE="${CURRENT_PROJECT_VERSION}" 
           FINAL_NEW_VERSION=""
           VSTEP_EFFECTIVE="$VSTEP" # Use this for current iteration's bump type
