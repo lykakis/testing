@@ -189,7 +189,6 @@ jobs:
             mvn -q -B org.codehaus.mojo:versions-maven-plugin:set -DnewVersion="${FINAL_NEW_VERSION}" -DgenerateBackupPoms=false
           fi
           git add pom.xml # Stage ./pom.xml
-          cd .. # Return to the repository root
 
           # --- Update Changelog.md (at the root) ---
           echo "Updating Changelog.md for version ${FINAL_NEW_VERSION}..."
