@@ -71,7 +71,7 @@ jobs:
           echo "Ensuring local main is up-to-date with remote..."
           git pull origin main --ff-only # Ensure working branch is latest main
 
-          # --- Determine Current Version from ./pom.xml ---
+          # --- Determine Current Version from ./pom.xml ----
           if [ -f "./mvnw" ]; then # Check for Maven wrapper in 
             chmod +x ./mvnw
             CURRENT_PROJECT_VERSION=$(./mvnw -q -B org.apache.maven.plugins:maven-help-plugin:evaluate -Dexpression=project.version -DforceStdout)
