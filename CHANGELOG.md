@@ -1,3 +1,7 @@
+## 1.0.5 (2025-11-13)
+
+* 7f40d6a fix(test): deploy option
+
 ## 1.0.4 (2025-05-16)
 
 * 12ac5df fix(test): cd2
