@@ -66,4 +66,4 @@ jobs:
       - name: test
         run: |
           #  logs while testing
-          echo "------  ${{ inputs.region } "
+          echo "------  ${{ inputs.region }} "
