@@ -1,0 +1,69 @@
+name: Deploy AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      region: # <-- 1. NEW INPUT ADDED HERE
+        description: 'Select the deployment region (runner)'
+        required: true
+        type: choice
+        default: 'linux'
+        options:
+          - 'linux'
+          - 'asia'
+      installation:
+        description: |-
+          Select installation name
+        required: true
+        type: choice
+        default: 'staging'
+        options: [ 'staging', 'aer', 'voutele', 'dasdaa', 'deed' ]
+      CheckDnsCert:
+        description: |-
+          Check installation DNS config and/or certificates
+        required: true
+        type: choice
+        default: 'No checks'
+        options: [ 'Check DNS and certificates', 'Check DNS only', 'Check certificates only', 'No checks' ]
+      DeployStack:
+        description: |-
+          Deploy mcore installation cloudformation stack
+        required: true
+        type: boolean
+        default: false
+      SMPPStack:
+        description: |-
+          Create/Remove/refresh SMPP stand alone stack
+        required: true
+        type: choice
+        default: 'Nothing'
+        options: ['Nothing', 'Create Stand Alone SMPP', 'Remove Stand Alone SMPP', 'Refresh SMPP only instance']
+      UpdateSmsg:
+        description: |-
+          Build&Upload and/or Deploy the SMS Gateway
+        required: true
+        type: choice
+        default: 'Nothing'
+        options: ['Build&Upload AND Deploy', 'Build&Upload only', 'Deploy only', 'Nothing']
+      UpdateUi:
+        description: |-
+          Deploy new UI stack and/or Build&Upload new UI
+        required: true
+        type: choice
+        default: 'Nothing'
+        options: ['Build&Upload AND Deploy', 'Build&Upload only', 'Deploy only', 'Nothing']
+      RefreshVpnNat:
+        description: |-
+          Refresh Vpn+Nat Gateway servers
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  DeployAWS:
+    runs-on: [self-hosted, ${{ inputs.region }}]
+    steps:
+      - name: test
+        run: |
+          #  logs while testing
+          echo "------  ${{ inputs.region } "
