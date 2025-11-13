@@ -61,7 +61,7 @@ on:
 
 jobs:
   DeployAWS:
-    runs-on: [self-hosted, ${{ inputs.region }}]
+    runs-on: [ self-hosted, "${{ inputs.region }}" ]
     steps:
       - name: test
         run: |
