@@ -3,14 +3,14 @@ name: Deploy AWS
 on:
   workflow_dispatch:
     inputs:
-      region: # <-- 1. NEW INPUT ADDED HERE
-        description: 'Select the deployment region (runner)'
+      deploymentServer:
+        description: 'Select the deployment server (runner)'
         required: true
         type: choice
-        default: 'linux'
+        default: 'self-hosted, asia'
         options:
-          - 'linux'
-          - 'asia'
+          - 'self-hosted, asia'
+          - 'ubuntu-latest'
       installation:
         description: |-
           Select installation name
@@ -58,12 +58,12 @@ on:
         required: true
         type: boolean
         default: false
-
 jobs:
   DeployAWS:
-    runs-on: [ self-hosted, "${{ inputs.region }}" ]
+    name: Build and deploy
+    runs-on: [ "${{ inputs.deploymentServer }}" ]
     steps:
       - name: test
         run: |
           #  logs while testing
-          echo "------  ${{ inputs.region }} "
+          echo "------  ${{ inputs.deploymentServer }} "
