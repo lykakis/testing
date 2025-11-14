@@ -1,3 +1,9 @@
+## 1.0.6 (2025-11-14)
+
+* dd324d6 fix(test): deploy
+* d196c4c Update deploy.yml
+* f497f0c Update deploy.yml
+
 ## 1.0.5 (2025-11-13)
 
 * 7f40d6a fix(test): deploy option
