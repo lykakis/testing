@@ -39,8 +39,21 @@ jobs:
     # Only run if a PR was successfully merged into the main branch
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
     needs: [ build-and-test ] # Ensures build-and-test passed on the merge commit
-
     steps:
+      # 1. Generate a temporary token from your new GitHub App
+      - name: Generate GitHub App Token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      # 2. Check out the code using the App's token
+      - name: Full Checkout for Release Process
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: 'main'
+          token: ${{ steps.generate_token.outputs.token }}
       - name: Full Checkout for Release Process
         uses: actions/checkout@v4
         with:
