@@ -1,3 +1,7 @@
+## 1.0.9 (2026-03-11)
+
+* 3cecadf fix(ci): test release
+
 ## 1.0.8 (2026-03-11)
 
 * 97a41d5 refactor(ci): added release app
