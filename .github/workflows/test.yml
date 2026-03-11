@@ -54,13 +54,6 @@ jobs:
           fetch-depth: 0
           ref: 'main'
           token: ${{ steps.generate_token.outputs.token }}
-      - name: Full Checkout for Release Process
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Required for git describe (tags) and git log (commits)
-          token: ${{ secrets.GITHUB_TOKEN }} # Use GITHUB_TOKEN for checkout and subsequent push
-          ref: 'main' # Explicitly checkout the main branch post-merge
-
       - name: Configure Git User
         run: |
           git config --global user.name 'github-actions[bot]'
