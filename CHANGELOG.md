@@ -1,3 +1,9 @@
+## 1.0.8 (2026-03-11)
+
+* 97a41d5 refactor(ci): added release app
+* dfb202f refactor(ci): added release app
+* a1b794e fix(ci):  test ci
+
 ## 1.0.7 (2025-11-14)
 
 * 58602e0 fix(test): deploy
