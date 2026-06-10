@@ -43,3 +43,6 @@ nb-configuration.xml
 /.quarkus/cli/plugins/
 # TLS Certificates
 .certs/
+
+# GitHub Pages build output
+sendium-kannel-converter/dist/

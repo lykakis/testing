@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sendium Kannel Converter</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Workflow test app</p>
+        <h1>Sendium Kannel Converter</h1>
+        <p>
+          Paste key-value Kannel settings and convert them into a normalized JSON payload.
+        </p>
+      </section>
+
+      <section class="converter" aria-label="Kannel converter">
+        <label for="input">Kannel configuration</label>
+        <textarea id="input" spellcheck="false">smsc-id = main-gateway
+host = 127.0.0.1
+port = 13013
+system-type = VMA</textarea>
+
+        <div class="actions">
+          <button id="convert" type="button">Convert</button>
+          <button id="clear" class="secondary" type="button">Clear</button>
+        </div>
+
+        <label for="output">JSON output</label>
+        <pre id="output" aria-live="polite"></pre>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

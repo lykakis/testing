@@ -2,9 +2,9 @@ name: Publish Kannel Converter
 
 on:
   push:
-    branches: [main]
+    branches: [main, test]
     paths:
-      - '.github/workflows/kannel-converter-pages.yml'
+      - '.github/workflows/converter-pages.yml'
       - 'sendium-kannel-converter/**'
   workflow_dispatch:
 
