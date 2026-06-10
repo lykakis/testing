@@ -1,0 +1,9 @@
+{
+  "name": "sendium-kannel-converter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static Kannel converter test app for GitHub Pages workflow validation.",
+  "scripts": {
+    "check": "node scripts/build.js"
+  }
+}
